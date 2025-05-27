@@ -18,6 +18,7 @@ class _PhoneInputScreenState extends State<PhoneInputScreen> {
   String _selectedCountryCode = '+91';
   bool _isButtonEnabled = false;
   bool _isLoading = false;
+  bool _showTestNumberInfo = true;
 
   @override
   void initState() {
@@ -55,7 +56,24 @@ class _PhoneInputScreenState extends State<PhoneInputScreen> {
       _selectedCountryCode = '+91';
       _phoneController.text = '7718556613';
       _isButtonEnabled = true;
+      _showTestNumberInfo = false;
     });
+
+    // Show confirmation
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Row(
+          children: [
+            Icon(Icons.check_circle, color: Colors.white),
+            SizedBox(width: 8),
+            Text('Test number loaded! You can now send the code.'),
+          ],
+        ),
+        backgroundColor: Colors.green,
+        duration: Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   Future<void> _submitPhoneNumber() async {
@@ -77,8 +95,28 @@ class _PhoneInputScreenState extends State<PhoneInputScreen> {
 
         if (success) {
           print('Phone verification initiated successfully');
+
+          // Show success message
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Row(
+                children: [
+                  Icon(Icons.check_circle, color: Colors.white),
+                  SizedBox(width: 8),
+                  Text('Verification code sent!'),
+                ],
+              ),
+              backgroundColor: Colors.green,
+              duration: Duration(seconds: 2),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+
           // Navigate to code verification screen
-          Navigator.of(context).pushNamed('/code_verification');
+          await Future.delayed(const Duration(milliseconds: 500));
+          if (mounted) {
+            Navigator.of(context).pushNamed('/code_verification');
+          }
         } else {
           print('Phone verification failed');
         }
@@ -90,9 +128,16 @@ class _PhoneInputScreenState extends State<PhoneInputScreen> {
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error: ${e.toString()}'),
+            content: Row(
+              children: [
+                const Icon(Icons.error_outline, color: Colors.white),
+                const SizedBox(width: 8),
+                Expanded(child: Text('Error: ${e.toString()}')),
+              ],
+            ),
             backgroundColor: Colors.red,
             behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 4),
           ),
         );
       }
@@ -119,13 +164,16 @@ class _PhoneInputScreenState extends State<PhoneInputScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Header
                     Text(
                       AppConstants.enterPhone,
-                      style: Theme.of(context).textTheme.titleMedium,
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'We\'ll send you a verification code',
+                      'We\'ll send you a verification code to confirm your number',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: Colors.grey[600],
                       ),
@@ -133,6 +181,13 @@ class _PhoneInputScreenState extends State<PhoneInputScreen> {
                     const SizedBox(height: 32),
 
                     // Phone number input with country code
+                    Text(
+                      'Phone Number',
+                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -144,32 +199,31 @@ class _PhoneInputScreenState extends State<PhoneInputScreen> {
                           decoration: BoxDecoration(
                             color: Colors.grey[100],
                             borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.grey[300]!),
                           ),
-                          child: Center(
-                            child: DropdownButtonHideUnderline(
-                              child: DropdownButton<String>(
-                                value: _selectedCountryCode,
-                                icon: const Icon(Icons.arrow_drop_down),
-                                items: const [
-                                  DropdownMenuItem(
-                                    value: '+91',
-                                    child: Text('+91'),
-                                  ),
-                                  DropdownMenuItem(
-                                    value: '+1',
-                                    child: Text('+1'),
-                                  ),
-                                  DropdownMenuItem(
-                                    value: '+44',
-                                    child: Text('+44'),
-                                  ),
-                                ],
-                                onChanged: (String? newValue) {
-                                  if (newValue != null) {
-                                    setState(() => _selectedCountryCode = newValue);
-                                  }
-                                },
-                              ),
+                          child: DropdownButtonHideUnderline(
+                            child: DropdownButton<String>(
+                              value: _selectedCountryCode,
+                              icon: const Icon(Icons.arrow_drop_down, size: 20),
+                              items: const [
+                                DropdownMenuItem(
+                                  value: '+91',
+                                  child: Text('+91', style: TextStyle(fontSize: 14)),
+                                ),
+                                DropdownMenuItem(
+                                  value: '+1',
+                                  child: Text('+1', style: TextStyle(fontSize: 14)),
+                                ),
+                                DropdownMenuItem(
+                                  value: '+44',
+                                  child: Text('+44', style: TextStyle(fontSize: 14)),
+                                ),
+                              ],
+                              onChanged: (String? newValue) {
+                                if (newValue != null) {
+                                  setState(() => _selectedCountryCode = newValue);
+                                }
+                              },
                             ),
                           ),
                         ),
@@ -179,9 +233,23 @@ class _PhoneInputScreenState extends State<PhoneInputScreen> {
                         Expanded(
                           child: TextFormField(
                             controller: _phoneController,
-                            decoration: const InputDecoration(
+                            decoration: InputDecoration(
                               hintText: '1234567890',
-                              prefixIcon: Icon(Icons.phone),
+                              prefixIcon: const Icon(Icons.phone),
+                              filled: true,
+                              fillColor: Colors.grey[100],
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(color: Colors.grey[300]!),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(color: Colors.grey[300]!),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(color: Theme.of(context).primaryColor),
+                              ),
                             ),
                             keyboardType: TextInputType.phone,
                             validator: _validatePhoneNumber,
@@ -192,62 +260,122 @@ class _PhoneInputScreenState extends State<PhoneInputScreen> {
                       ],
                     ),
 
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 24),
 
                     // Test number section - PROMINENT
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.blue[50],
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.blue[200]!, width: 1.5),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(Icons.info, color: Colors.blue[700], size: 18),
-                              const SizedBox(width: 8),
-                              Text(
-                                'Test Mode Available',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.blue[700],
-                                  fontSize: 14,
+                    if (_showTestNumberInfo)
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [Colors.blue[50]!, Colors.blue[100]!],
+                          ),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: Colors.blue[200]!, width: 1.5),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(6),
+                                  decoration: BoxDecoration(
+                                    color: Colors.blue[600],
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(Icons.info, color: Colors.white, size: 16),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Test Mode Available',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.blue[800],
+                                          fontSize: 16,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        'Use our test number for quick verification',
+                                        style: TextStyle(
+                                          color: Colors.blue[700],
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: Colors.blue[300]!),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Test Phone Number:',
+                                    style: TextStyle(
+                                      color: Colors.blue[800],
+                                      fontWeight: FontWeight.w500,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    '+91 7718556613',
+                                    style: TextStyle(
+                                      color: Colors.blue[900],
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                      fontFamily: 'monospace',
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Verification Code: 123456',
+                                    style: TextStyle(
+                                      color: Colors.blue[800],
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+
+                            const SizedBox(height: 16),
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton.icon(
+                                onPressed: _useTestNumber,
+                                icon: const Icon(Icons.phone_android, size: 18),
+                                label: const Text('Use Test Number'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.blue[600],
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(vertical: 14),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
                                 ),
                               ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Use the test number for development:\n+91 7718556613',
-                            style: TextStyle(
-                              color: Colors.blue[700],
-                              fontSize: 13,
                             ),
-                          ),
-                          const SizedBox(height: 12),
-                          SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton.icon(
-                              onPressed: _useTestNumber,
-                              icon: const Icon(Icons.phone_android, size: 16),
-                              label: const Text('Use Test Number'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.blue[600],
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 12),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
 
                     const SizedBox(height: 24),
 
@@ -258,7 +386,7 @@ class _PhoneInputScreenState extends State<PhoneInputScreen> {
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
                           color: Colors.red[50],
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(12),
                           border: Border.all(color: Colors.red[200]!),
                         ),
                         child: Column(
@@ -274,6 +402,7 @@ class _PhoneInputScreenState extends State<PhoneInputScreen> {
                                     style: TextStyle(
                                       color: Colors.red[600],
                                       fontWeight: FontWeight.bold,
+                                      fontSize: 14,
                                     ),
                                   ),
                                 ),
@@ -332,54 +461,55 @@ class _PhoneInputScreenState extends State<PhoneInputScreen> {
 
                     // Terms and conditions
                     Text(
-                      'By continuing, you agree to receive SMS messages for verification. Standard rates may apply.',
+                      'By continuing, you agree to receive SMS messages for verification. Standard messaging rates may apply.',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: Colors.grey[600],
                       ),
                       textAlign: TextAlign.center,
                     ),
 
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 24),
 
-                    // Debug info (show in debug mode)
-                    if (authService.errorMessage?.contains('reCAPTCHA') == true) ...[
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.orange[50],
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.orange[200]!),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Icon(Icons.warning, color: Colors.orange[600], size: 16),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'Debug Info',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.orange[600],
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'reCAPTCHA configuration issue. Use test numbers for development.',
-                              style: TextStyle(
-                                color: Colors.orange[600],
-                                fontSize: 11,
-                              ),
-                            ),
-                          ],
-                        ),
+                    // Additional help section
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[50],
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.grey[200]!),
                       ),
-                    ],
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.help_outline, color: Colors.grey[600], size: 16),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Having issues?',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.grey[700],
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            '• Make sure you have a stable internet connection\n'
+                                '• Check that your phone number is correct\n'
+                                '• Use the test number above for development\n'
+                                '• Contact support if issues persist',
+                            style: TextStyle(
+                              color: Colors.grey[600],
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               ),

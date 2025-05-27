@@ -11,7 +11,7 @@ class AuthService extends ChangeNotifier {
   // Firebase instances
   final FirebaseAuth _firebaseAuth = FirebaseAuth.instance;
   final GoogleSignIn _googleSignIn = GoogleSignIn(
-    scopes: ['email'], // Simplified scopes
+    scopes: ['email', 'profile'],
   );
 
   // Auth state
@@ -44,6 +44,9 @@ class AuthService extends ChangeNotifier {
     _authState = AuthState.initial;
 
     try {
+      // Check if user is already signed in with Google
+      await _googleSignIn.signInSilently();
+
       // Listen to auth state changes
       _firebaseAuth.authStateChanges().listen(_onAuthStateChanged);
 
@@ -53,10 +56,12 @@ class AuthService extends ChangeNotifier {
       if (_currentUser != null) {
         await _loadAuthMethod();
         _authState = AuthState.authenticated;
+        print('User already authenticated: ${_currentUser!.uid}');
       } else {
         _authState = AuthState.unauthenticated;
       }
     } catch (e) {
+      print('Error during initialization: $e');
       _authState = AuthState.unauthenticated;
       _errorMessage = e.toString();
     }
@@ -65,6 +70,7 @@ class AuthService extends ChangeNotifier {
   }
 
   void _onAuthStateChanged(User? user) async {
+    print('Auth state changed: ${user?.uid}');
     _currentUser = user;
 
     if (user != null) {
@@ -88,13 +94,15 @@ class AuthService extends ChangeNotifier {
 
       if (authMethod == 'google') {
         _lastMethod = AuthMethod.google;
+        // Try to get the current Google account
+        _googleAccount = _googleSignIn.currentUser;
       } else if (authMethod == 'phone') {
         _lastMethod = AuthMethod.phone;
         _phoneNumber = prefs.getString('phoneNumber');
         _isPhoneVerified = true;
       }
     } catch (e) {
-      // Handle error silently
+      print('Error loading auth method: $e');
     }
   }
 
@@ -111,12 +119,97 @@ class AuthService extends ChangeNotifier {
         }
       }
     } catch (e) {
-      // Handle error silently
+      print('Error saving auth method: $e');
     }
   }
 
-  // Phone number verification - ENHANCED
+  // Enhanced Google Sign In with better error handling
+  Future<bool> signInWithGoogle() async {
+    print('=== Starting Google Sign-In ===');
+
+    _authState = AuthState.loading;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      // First, sign out any existing sessions to ensure clean state
+      await _googleSignIn.signOut();
+      await Future.delayed(const Duration(milliseconds: 500));
+
+      print('Initiating Google Sign-In flow...');
+      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+
+      if (googleUser == null) {
+        print('User cancelled Google Sign-In');
+        _authState = AuthState.unauthenticated;
+        notifyListeners();
+        return false;
+      }
+
+      print('Google user selected: ${googleUser.email}');
+      print('Display name: ${googleUser.displayName}');
+
+      // Obtain the auth details from the request
+      print('Getting authentication details...');
+      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+
+      if (googleAuth.accessToken == null || googleAuth.idToken == null) {
+        throw Exception('Failed to obtain Google authentication tokens');
+      }
+
+      print('Successfully obtained Google auth tokens');
+
+      // Create a new credential
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      print('Created Firebase credential, signing in...');
+
+      // Sign in to Firebase with the Google credential
+      final UserCredential userCredential = await _firebaseAuth.signInWithCredential(credential);
+
+      if (userCredential.user != null) {
+        print('✅ Firebase sign-in successful!');
+        print('User ID: ${userCredential.user!.uid}');
+        print('Email: ${userCredential.user!.email}');
+        print('Display name: ${userCredential.user!.displayName}');
+
+        _googleAccount = googleUser;
+        _lastMethod = AuthMethod.google;
+        _authState = AuthState.authenticated;
+        _currentUser = userCredential.user;
+
+        await _saveAuthMethod();
+        notifyListeners();
+
+        return true;
+      } else {
+        throw Exception('Firebase authentication returned null user');
+      }
+    } on FirebaseAuthException catch (e) {
+      print('❌ Firebase Auth error: ${e.code} - ${e.message}');
+      _authState = AuthState.error;
+      _errorMessage = _getFirebaseAuthErrorMessage(e);
+      _lastMethod = null;
+      notifyListeners();
+      return false;
+    } catch (e) {
+      print('❌ Google Sign-In error: $e');
+      _authState = AuthState.error;
+      _errorMessage = 'Google Sign-in failed. Please check your internet connection and try again.';
+      _lastMethod = null;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  // Enhanced Phone number verification
   Future<bool> verifyPhoneNumber(String phoneNumber) async {
+    print('=== Starting Phone Verification ===');
+    print('Phone number: $phoneNumber');
+
     _authState = AuthState.loading;
     _lastMethod = AuthMethod.phone;
     _errorMessage = null;
@@ -128,86 +221,84 @@ class AuthService extends ChangeNotifier {
         phoneNumber: phoneNumber,
         timeout: const Duration(seconds: 60),
         verificationCompleted: (PhoneAuthCredential credential) async {
-          // Auto-verification completed (Android only)
           try {
-            print('Auto verification completed');
+            print('✅ Auto verification completed');
             await _firebaseAuth.signInWithCredential(credential);
             _lastMethod = AuthMethod.phone;
             _isPhoneVerified = true;
             _authState = AuthState.authenticated;
             notifyListeners();
           } catch (e) {
-            print('Auto-verification failed: $e');
-            _errorMessage = 'Auto-verification failed: ${e.toString()}';
+            print('❌ Auto-verification failed: $e');
+            _errorMessage = 'Auto-verification failed. Please enter the code manually.';
             _authState = AuthState.error;
             notifyListeners();
           }
         },
         verificationFailed: (FirebaseAuthException e) {
-          print('Verification failed: ${e.code} - ${e.message}');
+          print('❌ Phone verification failed: ${e.code} - ${e.message}');
           _authState = AuthState.error;
 
-          // Handle specific error cases
           switch (e.code) {
             case 'invalid-phone-number':
-              _errorMessage = 'The phone number format is invalid.';
+              _errorMessage = 'The phone number format is invalid. Please check and try again.';
               break;
             case 'too-many-requests':
-              _errorMessage = 'Too many requests. Please try again later.';
+              _errorMessage = 'Too many requests. Please wait before trying again.';
               break;
             case 'quota-exceeded':
-              _errorMessage = 'SMS quota exceeded. Try using test numbers.';
+              _errorMessage = 'SMS quota exceeded. Please try using the test number: +91 7718556613';
               break;
             case 'missing-client-identifier':
-              _errorMessage = 'Missing app verification. Please check Firebase setup.';
-              break;
             case 'app-not-authorized':
-              _errorMessage = 'App not authorized. Please check SHA fingerprint.';
+              _errorMessage = 'App verification failed. Please use the test number: +91 7718556613';
               break;
             default:
-              _errorMessage = 'Verification failed: ${e.message ?? 'Unknown error'}';
+              _errorMessage = 'Phone verification failed. Please use the test number: +91 7718556613';
           }
           notifyListeners();
         },
         codeSent: (String verificationId, int? resendToken) {
-          print('Code sent to $phoneNumber');
+          print('✅ SMS code sent successfully');
           _verificationId = verificationId;
           _resendToken = resendToken;
-          _authState = AuthState.unauthenticated; // Ready for code input
-          _errorMessage = null; // Clear any previous errors
+          _authState = AuthState.unauthenticated;
+          _errorMessage = null;
           notifyListeners();
         },
         codeAutoRetrievalTimeout: (String verificationId) {
-          print('Auto retrieval timeout');
+          print('Code auto-retrieval timeout');
           _verificationId = verificationId;
         },
       );
 
       return true;
     } catch (e) {
-      print('Phone verification error: $e');
+      print('❌ Phone verification error: $e');
       _authState = AuthState.error;
-      _errorMessage = 'Phone verification failed: ${e.toString()}';
+      _errorMessage = 'Phone verification failed. Please use the test number: +91 7718556613';
       notifyListeners();
       return false;
     }
   }
 
-  // Verify SMS code - ENHANCED
+  // Enhanced SMS code verification
   Future<bool> verifySmsCode(String smsCode) async {
     if (_verificationId == null) {
-      _errorMessage = 'Verification ID not found. Please resend code.';
+      _errorMessage = 'Verification session expired. Please request a new code.';
       _authState = AuthState.error;
       notifyListeners();
       return false;
     }
+
+    print('=== Verifying SMS Code ===');
+    print('Code: $smsCode');
 
     _authState = AuthState.loading;
     _errorMessage = null;
     notifyListeners();
 
     try {
-      print('Verifying SMS code: $smsCode');
       final credential = PhoneAuthProvider.credential(
         verificationId: _verificationId!,
         smsCode: smsCode,
@@ -219,109 +310,38 @@ class AuthService extends ChangeNotifier {
       _lastMethod = AuthMethod.phone;
       _authState = AuthState.authenticated;
 
-      print('Phone verification successful');
+      print('✅ Phone verification successful');
+      await _saveAuthMethod();
       notifyListeners();
       return true;
     } on FirebaseAuthException catch (e) {
-      print('SMS verification failed: ${e.code} - ${e.message}');
+      print('❌ SMS verification failed: ${e.code} - ${e.message}');
       _authState = AuthState.error;
 
       switch (e.code) {
         case 'invalid-verification-code':
-          _errorMessage = 'Invalid verification code. Please try again.';
+          _errorMessage = 'Invalid code. Please check and try again.';
           break;
         case 'session-expired':
-          _errorMessage = 'Verification code expired. Please request a new one.';
+          _errorMessage = 'Code expired. Please request a new one.';
           break;
         default:
-          _errorMessage = 'Verification failed: ${e.message ?? 'Unknown error'}';
+          _errorMessage = 'Verification failed. Please try again.';
       }
       notifyListeners();
       return false;
     } catch (e) {
-      print('Unexpected SMS verification error: $e');
+      print('❌ Unexpected SMS verification error: $e');
       _authState = AuthState.error;
-      _errorMessage = 'Unexpected error: ${e.toString()}';
+      _errorMessage = 'Verification failed. Please try again.';
       notifyListeners();
       return false;
     }
   }
 
-  // Google Sign In - ENHANCED WITH BETTER ERROR HANDLING
-  Future<bool> signInWithGoogle() async {
-    print('Starting Google Sign-In');
-    _authState = AuthState.loading;
-    _lastMethod = AuthMethod.google;
-    _errorMessage = null;
-    notifyListeners();
-
-    try {
-      // Trigger the authentication flow
-      print('Triggering Google Sign-In flow');
-      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
-
-      if (googleUser == null) {
-        // User cancelled the sign-in
-        print('User cancelled Google Sign-In');
-        _authState = AuthState.unauthenticated;
-        _lastMethod = null;
-        notifyListeners();
-        return false;
-      }
-
-      print('Google user selected: ${googleUser.email}');
-
-      // Obtain the auth details from the request
-      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
-
-      if (googleAuth.accessToken == null || googleAuth.idToken == null) {
-        throw Exception('Failed to obtain Google authentication tokens');
-      }
-
-      print('Got Google auth tokens');
-
-      // Create a new credential
-      final credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
-        idToken: googleAuth.idToken,
-      );
-
-      print('Created Firebase credential');
-
-      // Sign in to Firebase with the Google credential
-      final UserCredential userCredential = await _firebaseAuth.signInWithCredential(credential);
-
-      if (userCredential.user != null) {
-        print('Firebase sign-in successful: ${userCredential.user!.uid}');
-        _googleAccount = googleUser;
-        _lastMethod = AuthMethod.google;
-        _authState = AuthState.authenticated;
-        _currentUser = userCredential.user;
-        notifyListeners();
-        return true;
-      } else {
-        throw Exception('Failed to authenticate with Firebase');
-      }
-    } on FirebaseAuthException catch (e) {
-      print('Firebase Auth error: ${e.code} - ${e.message}');
-      _authState = AuthState.error;
-      _errorMessage = _getFirebaseAuthErrorMessage(e);
-      _lastMethod = null;
-      notifyListeners();
-      return false;
-    } catch (e) {
-      print('Google Sign-In error: $e');
-      _authState = AuthState.error;
-      _errorMessage = 'Google Sign-in failed: ${e.toString()}';
-      _lastMethod = null;
-      notifyListeners();
-      return false;
-    }
-  }
-
-  // Sign out - ENHANCED
+  // Enhanced sign out
   Future<void> signOut() async {
-    print('Signing out');
+    print('=== Signing Out ===');
     _authState = AuthState.loading;
     notifyListeners();
 
@@ -330,19 +350,19 @@ class AuthService extends ChangeNotifier {
       await _firebaseAuth.signOut();
 
       // Then sign out from Google if needed
-      if (_lastMethod == AuthMethod.google) {
+      if (_lastMethod == AuthMethod.google || _googleAccount != null) {
         try {
           await _googleSignIn.signOut();
+          await _googleSignIn.disconnect();
         } catch (e) {
-          print('Google sign out failed: $e');
+          print('Google sign out error: $e');
           // Continue with sign out even if Google fails
         }
       }
 
       // Clear saved auth state
       final prefs = await SharedPreferences.getInstance();
-      await prefs.remove('authMethod');
-      await prefs.remove('phoneNumber');
+      await prefs.clear();
 
       // Reset state
       _authState = AuthState.unauthenticated;
@@ -355,12 +375,12 @@ class AuthService extends ChangeNotifier {
       _resendToken = null;
       _errorMessage = null;
 
-      print('Sign out successful');
+      print('✅ Sign out successful');
       notifyListeners();
     } catch (e) {
-      print('Sign out error: $e');
-      _errorMessage = e.toString();
-      _authState = AuthState.unauthenticated; // Still sign out even on error
+      print('❌ Sign out error: $e');
+      _errorMessage = 'Sign out failed. Please try again.';
+      _authState = AuthState.unauthenticated;
       notifyListeners();
     }
   }
@@ -378,25 +398,25 @@ class AuthService extends ChangeNotifier {
   String _getFirebaseAuthErrorMessage(FirebaseAuthException error) {
     switch (error.code) {
       case 'account-exists-with-different-credential':
-        return 'An account already exists with a different sign-in method.';
+        return 'An account already exists with this email using a different sign-in method.';
       case 'invalid-credential':
-        return 'The credential is invalid or has expired.';
+        return 'The credential is invalid or has expired. Please try again.';
       case 'operation-not-allowed':
-        return 'This sign-in method is not enabled.';
+        return 'Google Sign-In is not enabled. Please contact support.';
       case 'user-disabled':
-        return 'This account has been disabled.';
+        return 'This account has been disabled. Please contact support.';
       case 'user-not-found':
-        return 'No account found with this credential.';
+        return 'No account found. Please try signing up first.';
       case 'wrong-password':
-        return 'Incorrect password.';
+        return 'Incorrect password. Please try again.';
       case 'invalid-verification-code':
         return 'The verification code is invalid.';
       case 'invalid-verification-id':
         return 'The verification ID is invalid.';
       case 'network-request-failed':
-        return 'Network error. Please check your connection.';
+        return 'Network error. Please check your connection and try again.';
       default:
-        return 'Authentication failed: ${error.message ?? 'Unknown error'}';
+        return 'Authentication failed. Please try again.';
     }
   }
 }

@@ -34,7 +34,7 @@ dev_dependencies:
 flutter:
   uses-material-design: true
 
-  # Uncomment if you have fonts or assets
+  # Uncomment and add font files if you want custom fonts
   # fonts:
   #   - family: Poppins
   #     fonts:
@@ -43,3 +43,8 @@ flutter:
   #         weight: 500
   #       - asset: fonts/Poppins-SemiBold.ttf
   #         weight: 600
+
+  # Uncomment if you have custom assets
+  # assets:
+  #   - assets/images/
+  #   - assets/icons/
