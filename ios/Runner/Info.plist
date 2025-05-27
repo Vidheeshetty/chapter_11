@@ -46,7 +46,7 @@
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 
-	<!-- URL scheme for Google Sign-In -->
+	<!-- URL scheme for Google Sign-In - FIXED -->
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
@@ -54,8 +54,8 @@
 			<string>REVERSED_CLIENT_ID</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<!-- IMPORTANT: Replace this with your actual REVERSED_CLIENT_ID from GoogleService-Info.plist -->
-				<string>PASTE_YOUR_REVERSED_CLIENT_ID_HERE</string>
+				<!-- FIXED: Using actual reversed client ID from Firebase config -->
+				<string>com.googleusercontent.apps.594502562664-p6rlvf9heu1mrtp82sifcs83370oihcl</string>
 			</array>
 		</dict>
 	</array>
