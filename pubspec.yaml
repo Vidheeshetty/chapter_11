@@ -1,0 +1,34 @@
+name: chapter_11
+description: "Chapter 11 Flutter project with Firebase Authentication."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.7.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+
+  # Firebase dependencies
+  firebase_core: ^2.24.2
+  firebase_auth: ^4.15.3
+  google_sign_in: ^6.1.6
+
+  # UI and State Management
+  provider: ^6.1.1
+  shared_preferences: ^2.2.2
+  connectivity_plus: ^5.0.2
+  internet_connection_checker: ^1.0.0+1
+  pin_code_fields: ^8.0.1
+  logger: ^2.0.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
