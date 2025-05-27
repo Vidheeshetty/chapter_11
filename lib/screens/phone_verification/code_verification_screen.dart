@@ -31,6 +31,10 @@ class _CodeVerificationScreenState extends State<CodeVerificationScreen>
     super.initState();
     _startResendTimer();
 
+    // Pre-fill with test code
+    _codeController.text = '123456';
+    _isCodeComplete = true;
+
     // Initialize shake animation for error feedback
     _shakeController = AnimationController(
       duration: const Duration(milliseconds: 600),
@@ -96,44 +100,10 @@ class _CodeVerificationScreenState extends State<CodeVerificationScreen>
         setState(() => _isCodeComplete = false);
       }
 
-      // Show loading state
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Row(
-            children: [
-              SizedBox(
-                width: 16,
-                height: 16,
-                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-              ),
-              SizedBox(width: 12),
-              Text('Resending code...'),
-            ],
-          ),
-          backgroundColor: Colors.blue,
-          behavior: SnackBarBehavior.floating,
-          duration: Duration(seconds: 2),
-        ),
-      );
-
       // Resend code and restart timer
       final success = await authService.verifyPhoneNumber(phoneNumber);
       if (success && mounted) {
         _startResendTimer();
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Row(
-              children: [
-                Icon(Icons.check_circle, color: Colors.white),
-                SizedBox(width: 8),
-                Text('New verification code sent!'),
-              ],
-            ),
-            backgroundColor: Colors.green,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
       }
     }
   }
@@ -151,30 +121,11 @@ class _CodeVerificationScreenState extends State<CodeVerificationScreen>
         setState(() => _isVerifying = false);
 
         if (success) {
-          // Show success message
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Row(
-                children: [
-                  Icon(Icons.check_circle, color: Colors.white),
-                  SizedBox(width: 8),
-                  Text('Phone verified successfully!'),
-                ],
-              ),
-              backgroundColor: Colors.green,
-              behavior: SnackBarBehavior.floating,
-            ),
+          // Navigate directly to welcome screen (sign in page)
+          Navigator.of(context).pushNamedAndRemoveUntil(
+            '/welcome',
+                (route) => false,
           );
-
-          // Small delay for user feedback
-          await Future.delayed(const Duration(milliseconds: 500));
-
-          if (mounted) {
-            Navigator.of(context).pushNamedAndRemoveUntil(
-              '/auth_success',
-                  (route) => false,
-            );
-          }
         } else {
           // Shake animation for error
           _shakeController.forward().then((_) => _shakeController.reset());
@@ -191,20 +142,6 @@ class _CodeVerificationScreenState extends State<CodeVerificationScreen>
         // Shake animation for error
         _shakeController.forward().then((_) => _shakeController.reset());
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.error_outline, color: Colors.white),
-                const SizedBox(width: 8),
-                Expanded(child: Text('Verification failed: $e')),
-              ],
-            ),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-
         // Clear the code field
         _codeController.clear();
         setState(() => _isCodeComplete = false);
@@ -218,22 +155,6 @@ class _CodeVerificationScreenState extends State<CodeVerificationScreen>
         _codeController.text = '123456';
         _isCodeComplete = true;
       });
-
-      // Show confirmation
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Row(
-            children: [
-              Icon(Icons.check_circle, color: Colors.white),
-              SizedBox(width: 8),
-              Text('Test code filled! You can now verify.'),
-            ],
-          ),
-          backgroundColor: Colors.green,
-          duration: Duration(seconds: 2),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
     }
   }
 
@@ -331,16 +252,16 @@ class _CodeVerificationScreenState extends State<CodeVerificationScreen>
 
                   const SizedBox(height: 24),
 
-                  // Test code helper - PROMINENT
+                  // Test code helper - prominent
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
-                        colors: [Colors.green[50]!, Colors.green[100]!],
+                        colors: [Colors.blue[50]!, Colors.blue[100]!],
                       ),
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: Colors.green[200]!, width: 1.5),
+                      border: Border.all(color: Colors.blue[200]!, width: 1.5),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -350,87 +271,30 @@ class _CodeVerificationScreenState extends State<CodeVerificationScreen>
                             Container(
                               padding: const EdgeInsets.all(6),
                               decoration: BoxDecoration(
-                                color: Colors.green[600],
+                                color: Colors.blue[600],
                                 shape: BoxShape.circle,
                               ),
                               child: const Icon(Icons.security, color: Colors.white, size: 16),
                             ),
                             const SizedBox(width: 12),
                             Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Test Verification Code',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.green[800],
-                                      fontSize: 16,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    'Use this code for the test number',
-                                    style: TextStyle(
-                                      color: Colors.green[700],
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                ],
+                              child: Text(
+                                'Test Code: 123456',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.blue[800],
+                                  fontSize: 16,
+                                ),
                               ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 16),
-
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.green[300]!),
-                          ),
-                          child: Column(
-                            children: [
-                              Text(
-                                'Verification Code:',
-                                style: TextStyle(
-                                  color: Colors.green[800],
-                                  fontWeight: FontWeight.w500,
-                                  fontSize: 12,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                '1 2 3 4 5 6',
-                                style: TextStyle(
-                                  color: Colors.green[900],
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 24,
-                                  letterSpacing: 8,
-                                  fontFamily: 'monospace',
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-
-                        const SizedBox(height: 16),
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton.icon(
-                            onPressed: _fillTestCode,
-                            icon: const Icon(Icons.content_paste, size: 18),
-                            label: const Text('Fill Test Code'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.green[600],
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                            ),
+                        const SizedBox(height: 12),
+                        Text(
+                          'The test code 123456 is pre-filled and ready to verify.',
+                          style: TextStyle(
+                            color: Colors.blue[700],
+                            fontSize: 13,
                           ),
                         ),
                       ],
@@ -481,21 +345,13 @@ class _CodeVerificationScreenState extends State<CodeVerificationScreen>
                               ],
                             ),
                           ),
-                        const SizedBox(height: 12),
-                        Text(
-                          AppConstants.autoDetectCode,
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Colors.grey[500],
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
                       ],
                     ),
                   ),
 
                   const SizedBox(height: 24),
 
-                  // Error message if any
+                  // Error message if any - simplified
                   if (authService.errorMessage != null) ...[
                     Container(
                       width: double.infinity,
@@ -505,60 +361,15 @@ class _CodeVerificationScreenState extends State<CodeVerificationScreen>
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(color: Colors.red[200]!),
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                      child: Row(
                         children: [
-                          Row(
-                            children: [
-                              Icon(Icons.error_outline, color: Colors.red[600], size: 20),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  'Verification Failed',
-                                  style: TextStyle(
-                                    color: Colors.red[600],
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            authService.errorMessage!,
-                            style: TextStyle(color: Colors.red[600]),
-                          ),
-                          const SizedBox(height: 12),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: ElevatedButton(
-                                  onPressed: () {
-                                    authService.resetError();
-                                    _codeController.clear();
-                                    setState(() => _isCodeComplete = false);
-                                  },
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.red[600],
-                                    foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(vertical: 8),
-                                  ),
-                                  child: const Text('Try Again'),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: ElevatedButton(
-                                  onPressed: _fillTestCode,
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.green[600],
-                                    foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(vertical: 8),
-                                  ),
-                                  child: const Text('Use Test Code'),
-                                ),
-                              ),
-                            ],
+                          Icon(Icons.error_outline, color: Colors.red[600], size: 20),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              authService.errorMessage!,
+                              style: TextStyle(color: Colors.red[600]),
+                            ),
                           ),
                         ],
                       ),

@@ -9,6 +9,10 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
     <uses-permission android:name="android.permission.WAKE_LOCK"/>
 
+    <!-- Google Sign-In permissions -->
+    <uses-permission android:name="android.permission.GET_ACCOUNTS"/>
+    <uses-permission android:name="android.permission.USE_CREDENTIALS"/>
+
     <application
         android:label="chapter_11"
         android:name="${applicationName}"
@@ -26,10 +30,7 @@
             android:hardwareAccelerated="true"
             android:windowSoftInputMode="adjustResize">
 
-            <!-- Specifies an Android theme to apply to this Activity as soon as
-                 the Android process has started. This theme is visible to the user
-                 while the Flutter UI initializes. After that, this theme continues
-                 to determine the Window background behind the Flutter UI. -->
+            <!-- Specifies an Android theme to apply to this Activity -->
             <meta-data
                 android:name="io.flutter.embedding.android.NormalTheme"
                 android:resource="@style/NormalTheme"
@@ -51,8 +52,12 @@
             android:name="com.google.firebase.auth.api.phone.FIREBASE_AUTH_DOMAIN"
             android:value="chapter-11-7c517.firebaseapp.com" />
 
-        <!-- Don't delete the meta-data below.
-             This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
+        <!-- Google Sign-In configuration -->
+        <meta-data
+            android:name="com.google.android.gms.auth.api.signin.GoogleSignInOptions"
+            android:value="server_client_id" />
+
+        <!-- Don't delete the meta-data below -->
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
@@ -76,5 +81,7 @@
         </intent>
         <!-- For Google Sign-In -->
         <package android:name="com.google.android.gms" />
+        <!-- For Gmail app -->
+        <package android:name="com.google.android.gm" />
     </queries>
 </manifest>

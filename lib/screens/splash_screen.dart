@@ -16,13 +16,12 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
-  bool _isRetrying = false;
   Timer? _navigationTimer;
 
   @override
   void initState() {
     super.initState();
-    _checkNetworkAndNavigate();
+    _checkAuthAndNavigate();
   }
 
   @override
@@ -31,14 +30,14 @@ class _SplashScreenState extends State<SplashScreen> {
     super.dispose();
   }
 
-  void _checkNetworkAndNavigate() {
+  void _checkAuthAndNavigate() {
     final networkService = Provider.of<NetworkService>(context, listen: false);
     final authService = Provider.of<AuthService>(context, listen: false);
 
     if (networkService.isConnected) {
-      // If connected, wait and navigate to appropriate screen
+      // Wait a bit then check auth state
       _navigationTimer = Timer(
-        const Duration(seconds: AppConstants.splashTransitionDelay),
+        const Duration(seconds: 2),
             () {
           if (!mounted) return;
 
@@ -51,10 +50,7 @@ class _SplashScreenState extends State<SplashScreen> {
         },
       );
     } else {
-      // If not connected, show retrying state
-      setState(() => _isRetrying = true);
-
-      // Listen for network changes
+      // If not connected, wait for connection
       networkService.addListener(_onNetworkChanged);
     }
   }
@@ -62,7 +58,7 @@ class _SplashScreenState extends State<SplashScreen> {
   void _onNetworkChanged() {
     final networkService = Provider.of<NetworkService>(context, listen: false);
 
-    if (networkService.isConnected && _isRetrying) {
+    if (networkService.isConnected) {
       // Remove listener to avoid multiple navigations
       networkService.removeListener(_onNetworkChanged);
 
@@ -109,6 +105,9 @@ class _SplashScreenState extends State<SplashScreen> {
                     style: Theme.of(context).textTheme.bodySmall,
                     textAlign: TextAlign.center,
                   ),
+                ] else ...[
+                  const SizedBox(height: 32),
+                  const LoadingIndicator(),
                 ],
               ],
             ),
