@@ -17,6 +17,8 @@ class WelcomeScreen extends StatefulWidget {
 class _WelcomeScreenState extends State<WelcomeScreen> {
   bool _showNetworkError = false;
   bool _showGoogleError = false;
+  bool _isGoogleLoading = false;
+  bool _isPhoneLoading = false;
 
   @override
   Widget build(BuildContext context) {
@@ -51,21 +53,34 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                       // Phone sign-in button
                       CustomButton(
                         text: AppConstants.continueWithPhone,
-                        onPressed: () {
+                        onPressed: () async {
                           if (!networkService.isConnected) {
                             setState(() => _showNetworkError = true);
                             return;
                           }
-                          Navigator.of(context).pushNamed('/phone_verification');
+
+                          setState(() {
+                            _isPhoneLoading = true;
+                            _showNetworkError = false;
+                            _showGoogleError = false;
+                          });
+
+                          // Small delay to show loading state
+                          await Future.delayed(const Duration(milliseconds: 300));
+
+                          if (mounted) {
+                            setState(() => _isPhoneLoading = false);
+                            Navigator.of(context).pushNamed('/phone_verification');
+                          }
                         },
-                        isLoading: authService.isLoading && authService.lastMethod == AuthMethod.phone,
+                        isLoading: _isPhoneLoading,
                       ),
 
                       const SizedBox(height: 24),
                       Text(AppConstants.orContinueWith),
                       const SizedBox(height: 24),
 
-                      // Google sign-in button
+                      // Google sign-in button - UPDATED WITH FIXES
                       GoogleSignInButton(
                         onPressed: () async {
                           if (!networkService.isConnected) {
@@ -73,16 +88,40 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                             return;
                           }
 
-                          // Direct Google Sign-In with Firebase
-                          final success = await authService.signInWithGoogle();
+                          setState(() {
+                            _isGoogleLoading = true;
+                            _showNetworkError = false;
+                            _showGoogleError = false;
+                          });
 
-                          if (success && mounted) {
-                            Navigator.of(context).pushNamedAndRemoveUntil('/auth_success', (route) => false);
-                          } else if (mounted && authService.errorMessage != null) {
-                            setState(() => _showGoogleError = true);
+                          try {
+                            // Direct Google Sign-In with Firebase
+                            final success = await authService.signInWithGoogle();
+
+                            if (mounted) {
+                              setState(() => _isGoogleLoading = false);
+
+                              if (success) {
+                                // Navigate to success screen
+                                Navigator.of(context).pushNamedAndRemoveUntil(
+                                    '/auth_success',
+                                        (route) => false
+                                );
+                              } else {
+                                // Show error if sign-in failed
+                                setState(() => _showGoogleError = true);
+                              }
+                            }
+                          } catch (e) {
+                            if (mounted) {
+                              setState(() {
+                                _isGoogleLoading = false;
+                                _showGoogleError = true;
+                              });
+                            }
                           }
                         },
-                        isLoading: authService.isLoading && authService.lastMethod == AuthMethod.google,
+                        isLoading: _isGoogleLoading,
                       ),
 
                       // Network error message
@@ -98,10 +137,10 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                       ],
 
                       // Google sign-in error message
-                      if (_showGoogleError && authService.errorMessage != null) ...[
+                      if (_showGoogleError) ...[
                         const SizedBox(height: 16),
                         ErrorContainer(
-                          message: authService.errorMessage!,
+                          message: authService.errorMessage ?? AppConstants.googleSignInFailed,
                           onRetry: () {
                             setState(() => _showGoogleError = false);
                             authService.resetError();
@@ -126,7 +165,13 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                         Text(AppConstants.alreadyMember),
                         TextButton(
                           onPressed: () {
-                            // In a real app, this would navigate to a login screen
+                            // Navigate to login or show login options
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Use phone or Google sign-in above to log in'),
+                                duration: Duration(seconds: 2),
+                              ),
+                            );
                           },
                           child: Text(AppConstants.logIn),
                         ),
@@ -138,7 +183,13 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                         Text(AppConstants.dontHaveAccount),
                         TextButton(
                           onPressed: () {
-                            // In a real app, this would navigate to a sign up screen
+                            // Navigate to sign up or show sign up options
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Use phone or Google sign-in above to create account'),
+                                duration: Duration(seconds: 2),
+                              ),
+                            );
                           },
                           child: Text(AppConstants.signUp),
                         ),

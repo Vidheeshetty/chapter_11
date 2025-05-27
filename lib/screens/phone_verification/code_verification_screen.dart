@@ -20,6 +20,7 @@ class _CodeVerificationScreenState extends State<CodeVerificationScreen> {
   int _resendSeconds = 60; // 1 minute countdown
   Timer? _resendTimer;
   bool _canResend = false;
+  bool _isDisposed = false; // Track disposal state
 
   @override
   void initState() {
@@ -29,26 +30,50 @@ class _CodeVerificationScreenState extends State<CodeVerificationScreen> {
 
   @override
   void dispose() {
-    _codeController.dispose();
+    _isDisposed = true; // Mark as disposed first
+
+    // Cancel timer before disposing controller
     _resendTimer?.cancel();
+    _resendTimer = null;
+
+    // Dispose controller
+    _codeController.dispose();
+
     super.dispose();
   }
 
   void _startResendTimer() {
+    // Cancel existing timer
+    _resendTimer?.cancel();
+
+    // Check if widget is still mounted
+    if (_isDisposed || !mounted) return;
+
     setState(() {
       _resendSeconds = 60;
       _canResend = false;
     });
 
     _resendTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      setState(() {
-        if (_resendSeconds > 0) {
-          _resendSeconds--;
-        } else {
-          _canResend = true;
-          timer.cancel();
-        }
-      });
+      // Critical: Check if widget is disposed or unmounted
+      if (_isDisposed || !mounted) {
+        timer.cancel();
+        return;
+      }
+
+      // Safe setState call
+      if (mounted) {
+        setState(() {
+          if (_resendSeconds > 0) {
+            _resendSeconds--;
+          } else {
+            _canResend = true;
+            timer.cancel();
+          }
+        });
+      } else {
+        timer.cancel();
+      }
     });
   }
 
@@ -59,29 +84,35 @@ class _CodeVerificationScreenState extends State<CodeVerificationScreen> {
   }
 
   void _resendCode() async {
-    if (!_canResend) return;
+    if (!_canResend || _isDisposed || !mounted) return;
 
     final authService = Provider.of<AuthService>(context, listen: false);
     final phoneNumber = authService.phoneNumber;
 
     if (phoneNumber != null) {
       // Reset the code field
-      _codeController.clear();
-      setState(() => _isCodeComplete = false);
+      if (mounted && !_isDisposed) {
+        _codeController.clear();
+        setState(() => _isCodeComplete = false);
+      }
 
       // Resend code and restart timer
-      await authService.verifyPhoneNumber(phoneNumber);
-      _startResendTimer();
+      final success = await authService.verifyPhoneNumber(phoneNumber);
+      if (success && mounted && !_isDisposed) {
+        _startResendTimer();
+      }
     }
   }
 
   void _verifyCode() async {
+    if (_isDisposed || !mounted) return;
+
     final authService = Provider.of<AuthService>(context, listen: false);
 
     // Submit verification code
     final success = await authService.verifySmsCode(_codeController.text);
 
-    if (success && mounted) {
+    if (success && mounted && !_isDisposed) {
       // Navigate to success screen
       Navigator.of(context).pushNamedAndRemoveUntil('/auth_success', (route) => false);
     }
@@ -89,6 +120,11 @@ class _CodeVerificationScreenState extends State<CodeVerificationScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Return empty container if disposed
+    if (_isDisposed) {
+      return const SizedBox.shrink();
+    }
+
     final authService = Provider.of<AuthService>(context);
 
     return Scaffold(
@@ -96,7 +132,11 @@ class _CodeVerificationScreenState extends State<CodeVerificationScreen> {
         title: const Text(AppConstants.phoneVerification),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: () {
+            if (mounted && !_isDisposed) {
+              Navigator.of(context).pop();
+            }
+          },
         ),
       ),
       body: Padding(
@@ -138,10 +178,14 @@ class _CodeVerificationScreenState extends State<CodeVerificationScreen> {
               enableActiveFill: true,
               keyboardType: TextInputType.number,
               onCompleted: (value) {
-                setState(() => _isCodeComplete = true);
+                if (mounted && !_isDisposed) {
+                  setState(() => _isCodeComplete = true);
+                }
               },
               onChanged: (value) {
-                setState(() => _isCodeComplete = value.length == 6);
+                if (mounted && !_isDisposed) {
+                  setState(() => _isCodeComplete = value.length == 6);
+                }
               },
             ),
 
@@ -186,7 +230,7 @@ class _CodeVerificationScreenState extends State<CodeVerificationScreen> {
             // Verify button
             CustomButton(
               text: 'Verify',
-              onPressed: _verifyCode,
+              onPressed: _isCodeComplete ? _verifyCode : null,
               isLoading: authService.isLoading,
               isEnabled: _isCodeComplete,
             ),
